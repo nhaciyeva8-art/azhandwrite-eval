@@ -137,21 +137,30 @@ td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:top}tr:l
 
     <div class="card">
       <div class="ct"><span>2 · AI nəticəsi və düzəliş</span><span class="tag t-m" id="src">Hələ oxunmayıb</span></div>
-      <span class="lbl" id="rawLbl">AI-ın oxuduğu (xam) mətn — fərqli hərflər sarı ilə:</span>
+      <span class="lbl" id="rawLbl">AI-nin oxuduğu mətn (xam OCR):</span>
       <div class="raw empty" id="raw">AI hələ oxumayıb. Nəticə burada görünəcək.</div>
-      <span class="lbl">Düzgün (etalon) mətn — səhvləri burada düzəlt:</span>
+      <div id="autoCorrectPanel" style="display:none;margin-top:14px">
+        <span class="lbl">✨ AI-nin avtomatik düzəltdiyi mətn — dəyişikliklər sarı ilə:</span>
+        <div class="raw" id="autoCorrectText" style="background:#fff9e9;white-space:pre-wrap"></div>
+        <div id="autoCorrectNote" style="font-size:.78rem;color:var(--mut);margin-top:6px">Sarı işarələr AI-nin təklif etdiyi dəyişikliklərdir; təsdiqlənmiş OCR səhvləri deyil.</div>
+      </div>
+      <div class="row" style="margin:12px 0"><button class="btn b3" id="demoBtn" onclick="fillTruth()" disabled>🔎 Düzgün cavabı göstər</button></div>
+      <div id="answerArea" style="display:none"><span class="lbl" id="answerLabel">Düzgün cavab — yoxlayıb təsdiqlə:</span>
       <div class="chars">
         <button onclick="ins('ə')">ə</button><button onclick="ins('ö')">ö</button><button onclick="ins('ü')">ü</button><button onclick="ins('ğ')">ğ</button><button onclick="ins('ş')">ş</button><button onclick="ins('ç')">ç</button><button onclick="ins('ı')">ı</button>
       </div>
-      <textarea id="truth" rows="3" oninput="liveCer()" placeholder="AI oxuduqdan sonra mətn buraya düşəcək"></textarea>
+      <textarea id="truth" rows="3" oninput="onTruthInput()" placeholder="Cavabı yoxla, lazım olsa redaktə et"></textarea></div>
       <div class="mg">
         <div><label class="lbl" for="diff">Xətt çətinliyi</label><select id="diff"><option>Çətin</option><option>Orta</option><option>Asan</option></select></div>
         <div><label class="lbl" for="dtype">Mətn növü</label><select id="dtype"><option>Mühazirə</option><option>Sənəd</option><option>Qeyd</option></select></div>
       </div>
-      <div class="cer"><span>Hərf səhvi <strong>CER</strong> (AI vs düzgün mətn)</span><b id="cerv">0.0%</b></div>
+      <div class="cer"><span id="cerLabel">CER — düzgün cavab açılmayıb</span><b id="cerv">—</b></div>
+      <div id="ragStatus" style="font-size:.78rem;color:var(--mut);margin-top:7px;display:none"></div>
+      <div id="extraMetrics" style="font-size:.82rem;color:var(--mut);margin-top:8px;display:none"></div>
+      <div class="row" style="margin-top:9px"><button class="btn b3" id="languageBtn" onclick="runLanguageReview()" disabled>📝 Orfoqrafiya və qrammatikanı yoxla</button></div>
+      <div id="languageResult" style="display:none;white-space:pre-wrap;background:var(--bg);padding:12px;border-radius:9px;margin-top:8px;font-size:.86rem"></div>
       <div class="row">
         <button class="btn b2" style="flex:1" onclick="save()">✅ Təsdiqlə və datasetə əlavə et</button>
-        <button class="btn b3" id="demoBtn" onclick="fillTruth()" title="Yalnız hazır nümunələr üçün">Düzgün cavabı göstər</button>
       </div>
     </div>
   </div>
@@ -164,7 +173,7 @@ td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:top}tr:l
     <div class="kpi"><span>Ümumi nümunə</span><b id="k-n">0</b><small>şəkil–mətn cütü</small></div>
     <div class="kpi"><span>Orta CER</span><b id="k-c" style="color:var(--ter)">0%</b><small>xam AI çıxarışında xəta</small></div>
     <div class="kpi"><span>Təsdiqlənmiş</span><b id="k-v" style="color:var(--tealD)">100%</b><small>insan yoxlamalı</small></div>
-    <div class="kpi"><span>Xüsusi hərf dəqiqliyi</span><b id="k-a">0%</b><small>ə ğ ı ö ü ş ç üzrə (təxmini)</small></div>
+    <div class="kpi"><span>Xüsusi hərf dəqiqliyi</span><b id="k-a">0%</b><small>ayrıca etalon əsaslı ölçmə tələb olunur</small></div>
   </div>
   <div class="tw"><table><thead><tr><th>ID</th><th>Mənbə</th><th>Xam AI mətni</th><th>Düzgün mətn</th><th>CER</th><th>Çətinlik</th><th>Status</th></tr></thead><tbody id="dsb"></tbody></table></div>
 </section>
@@ -203,7 +212,8 @@ const BM0=[
  {name:"GPT-4o Vision (zero-shot)",cer:9.2,wer:17.8,az:89.4,lat:"2.3 san"},
  {name:"Gemini Vision (zero-shot)",cer:8.7,wer:16.9,az:90.2,lat:"1.9 san"},
  {name:"Təklif olunan hibrid pipeline (OCR + AZ qrammatika)",cer:4.6,wer:9.8,az:96.4,lat:"1.5 san",hl:true}];
-let cur={idx:0,src:SAMPLES[0].src,file:null,raw:""},ds=[],bm=[];
+let cur={idx:0,src:SAMPLES[0].src,file:null,raw:"",corrected:"",revealed:false,verified:false,live:false},ds=[],bm=[];
+let evaluationSeq=0;
 
 function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;let p=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[n]}
 const cerOf=(r,t)=>{t=(t||"").trim();return t?+(lev((r||"").trim(),t)/t.length*100).toFixed(1):0};
@@ -216,48 +226,169 @@ function draw(lines){const c=$("cv"),x=c.getContext("2d"),w=c.width,h=c.height;$
  x.fillStyle="#FFFDF7";x.fillRect(0,0,w,h);x.strokeStyle="#CBD5E1";for(let y=45;y<h;y+=44){x.beginPath();x.moveTo(20,y);x.lineTo(w-20,y);x.stroke()}
  x.strokeStyle="#FCA5A5";x.beginPath();x.moveTo(46,0);x.lineTo(46,h);x.stroke();x.fillStyle="#1E3A8A";x.font="italic 22px 'Segoe Print','Comic Sans MS','Bradley Hand',cursive,Georgia,serif";
  lines.forEach((l,i)=>{x.save();x.translate(i%2?63:58,42+i*44);x.rotate((i-1)*.008);x.fillText(l,0,0);x.restore()})}
-function resetOut(){cur.raw="";$("rawLbl").textContent="AI-ın oxuduğu (xam) mətn — fərqli hərflər sarı ilə:";$("raw").className="raw empty";$("raw").textContent="AI hələ oxumayıb. Nəticə burada görünəcək.";$("truth").value="";$("cerv").textContent="0.0%";$("src").textContent="Hələ oxunmayıb";$("src").className="tag t-m"}
-function loadSample(i){cur={idx:i,src:SAMPLES[i].src,file:null,raw:""};document.querySelectorAll(".chip").forEach((c,j)=>c.classList.toggle("sel",j===i));
+function resetOut(){evaluationSeq++;$("autoCorrectPanel").style.display="none";$("extraMetrics").style.display="none";$("ragStatus").style.display="none";$("languageResult").style.display="none";$("languageBtn").disabled=true;cur.raw="";cur.corrected="";cur.reviewOk=false;cur.revealed=false;cur.verified=false;$("answerArea").style.display="none";$("demoBtn").disabled=true;$("demoBtn").textContent="🔎 Düzgün cavabı göstər";$("rawLbl").textContent="AI-nin oxuduğu mətn (xam OCR):";$("raw").className="raw empty";$("raw").textContent="AI hələ oxumayıb. Nəticə burada görünəcək.";$("truth").value="";$("cerv").textContent="—";$("cerLabel").textContent="CER — düzgün cavab açılmayıb";$("src").textContent="Hələ oxunmayıb";$("src").className="tag t-m"}
+function loadSample(i){cur={idx:i,src:SAMPLES[i].src,file:null,raw:"",corrected:"",revealed:false,verified:false,live:false};document.querySelectorAll(".chip").forEach((c,j)=>c.classList.toggle("sel",j===i));
  draw(SAMPLES[i].lines);$("diff").value=SAMPLES[i].diff;$("dtype").value=SAMPLES[i].type;$("demoBtn").style.display="";resetOut();setStep(1);$("status").className="status";$("status").textContent="Nümunə hazırdır. “AI ilə oxu” düyməsinə bas."}
 function onFile(e){const f=e.target.files[0];if(!f)return;if(!f.type.startsWith("image/")){toast("Hələlik yalnız şəkil faylları (JPG, PNG, WEBP) analiz olunur.");return}const r=new FileReader();r.onload=ev=>{$("cv").style.display="none";$("up").src=ev.target.result;$("up").style.display="block";
- cur={idx:-1,src:f.name,file:f,raw:""};document.querySelectorAll(".chip").forEach(c=>c.classList.remove("sel"));$("demoBtn").style.display="none";resetOut();setStep(1);$("status").className="status";$("status").textContent="Şəkil yükləndi: "+f.name+". İndi “AI ilə oxu” düyməsinə bas."};r.readAsDataURL(f)}
+ cur={idx:-1,src:f.name,file:f,raw:"",corrected:"",revealed:false,verified:false,live:false};document.querySelectorAll(".chip").forEach(c=>c.classList.remove("sel"));$("demoBtn").style.display="";resetOut();setStep(1);$("status").className="status";$("status").textContent="Şəkil yükləndi: "+f.name+". İndi “AI ilə oxu” düyməsinə bas."};r.readAsDataURL(f)}
 
 const PROMPT="Şəkli diqqətlə analiz et. Əgər şəkildə əlyazma mətn varsa: birinci sətirdə yalnız ƏLYAZMA sözünü yaz, sonrakı sətirdə mətni olduğu kimi oxu (Azərbaycan Latın əlifbası; ə, ğ, ı, İ, ö, ü, ş, ç hərflərini dəqiq saxla, mətni düzəltmə, sətir sonlarını boşluqla əvəz et, izah əlavə etmə). Əgər əlyazma yoxdursa (çap mətn, sənəd, foto, cədvəl, şəkil və s.): birinci sətirdə yalnız DİGƏR sözünü yaz, sonra şəkildə nə olduğunu Azərbaycan dilində 3-5 cümlə ilə izah et; görünən mətn varsa onu da oxu.";
 async function getBlob(){if(cur.file)return cur.file;return new Promise(r=>$("cv").toBlob(r,"image/png"))}
 async function runAI(){
  const btn=$("aiBtn"),st=$("status");btn.disabled=true;btn.textContent="⏳ AI oxuyur…";$("pv").classList.add("scanning");setStep(2);st.className="status";st.textContent="AI şəkli təhlil edir, bir neçə saniyə gözləyin…";
- let text="",live=true,kind="hw";
+ let text="",corrected="",live=true,kind="hw",reviewOk=false,correctionOk=false;
  try{
-  const s=await claude.use("sample");if(!s)throw{code:"none"};
-  const lim=await s.limits();if(!lim||!lim.images)throw{code:"noimg"};
   const blob=await getBlob();
-  const out=await s(PROMPT,{images:[blob],modelTier:"default",cache:false,onText:({text:t})=>{cur.raw=t.replace(/^Thinking\.\.\.$/,"");}});
-  text=(out.text||"").trim();if(!text)throw{code:"empty"};
-  const mm=text.match(/^\s*(ƏLYAZMA|DİGƏR)\s*\n?([\s\S]*)$/i);if(mm){kind=/^D/i.test(mm[1])?"other":"hw";text=mm[2].trim()}
+  if(!blob)throw new Error("Şəkil seçilməyib");
+  const form=new FormData();form.append("file",blob,cur.src||"handwriting.png");
+  const res=await fetch("/api/ocr",{method:"POST",body:form});
+  const payload=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(payload.detail||`OCR xətası (${res.status})`);
+  kind=payload.kind==="other"?"other":"hw";text=(payload.raw_text||payload.text||"").trim();corrected=(payload.corrected_text||text).trim();reviewOk=payload.review_success===true;correctionOk=payload.correction_success===true;const rag=payload.rag_rules||[];$("ragStatus").style.display="block";$("ragStatus").textContent=rag.length?"📚 Mini-RAG: "+rag.map(x=>x.id+" ("+(x.source_type==="editorial_summary_unverified"?"işçi qayda":"mənbə konteksti")+")").join(", "):"📚 Mini-RAG: uyğun qayda tapılmadı";
+  if(!text)throw new Error("AI boş nəticə qaytardı");
  }catch(e){
-  if(cur.idx<0){$("pv").classList.remove("scanning");btn.disabled=false;btn.textContent="✨ AI ilə yenidən oxu";setStep(1);st.className="status warn";st.textContent="AI şəkli analiz edə bilmədi (icazə verilməyib, limit dolub və ya xəta baş verib). Bir azdan yenidən cəhd et.";return}
-  live=false;text=SAMPLES[cur.idx].demo;
-  st.className="status warn";st.textContent="Canlı AI bu mühitdə əlçatan deyil. Hazır nümunə üçün demo nəticə göstərilir.";
+  if(cur.idx<0){$("pv").classList.remove("scanning");btn.disabled=false;btn.textContent="✨ AI ilə yenidən oxu";setStep(1);st.className="status warn";st.textContent="AI analiz xətası: "+(e.message||"Server əlçatan deyil");return}
+  live=false;text=SAMPLES[cur.idx].demo;corrected=text;reviewOk=false;
+  st.className="status warn";st.textContent="Canlı AI əlçatan deyil. Hazır nümunə üçün yalnız demo nəticə göstərilir. Səbəb: "+(e.message||"xəta");
  }
  $("pv").classList.remove("scanning");btn.disabled=false;btn.textContent="✨ AI ilə yenidən oxu";
  $("src").textContent=live?"Canlı AI":"Demo rejimi";$("src").className="tag "+(live?"t-ok":"t-m");
- if(kind==="other"){cur.raw="";$("rawLbl").textContent="AI-ın analizi:";$("raw").className="raw";$("raw").style.whiteSpace="pre-wrap";$("raw").textContent=text;$("truth").value="";$("cerv").textContent="—";st.className="status";st.textContent="Bu şəkildə əlyazma tapılmadı, ona görə AI şəkli təsvir etdi. Dataset üçün əlyazma şəkli yüklə.";setStep(2);return}
- $("rawLbl").textContent="AI-ın oxuduğu (xam) mətn — fərqli hərflər sarı ilə:";
- cur.raw=text;$("truth").value=text;
- if(live){st.className="status";st.textContent="Hazırdır! AI əlyazmanı oxudu. İndi sağ tərəfdə səhvləri düzəldin və təsdiqləyin."}
- liveCer();setStep(3);
+ if(kind==="other"){$("rawLbl").textContent="AI-ın analizi:";cur.raw="";$("raw").className="raw";$("raw").style.whiteSpace="pre-wrap";$("raw").textContent=text;$("truth").value="";$("cerv").textContent="—";st.className="status";st.textContent="Bu şəkildə əlyazma tapılmadı. Dataset üçün əlyazma şəkli yüklə.";setStep(2);return}
+ $("rawLbl").textContent="AI-nin oxuduğu mətn (xam OCR):";
+ cur.raw=text;cur.corrected=corrected;cur.reviewOk=reviewOk;cur.correctionOk=correctionOk;$("languageBtn").disabled=false;$("languageResult").style.display="none";$("languageResult").textContent="";cur.live=live;cur.revealed=false;cur.verified=false;$("truth").value="";$("answerArea").style.display="none";$("demoBtn").disabled=false;$("demoBtn").textContent=cur.idx>=0?"🔎 Düzgün cavabı göstər":"🔎 AI düzəlişini göstər";
+ if(live){st.className="status";st.textContent=correctionOk?"OCR və AI avtomatik düzəlişi tamamlandı. Sarı hissələr düzəldilmiş mətnin üzərində göstərilir.":"OCR hazırdır. Avtomatik düzəliş alınmayıbsa, ilkin mətn saxlanılır."}
+ showAutomaticCorrections();liveCer();setStep(3);
 }
-function fillTruth(){if(cur.idx<0||!cur.raw){toast("Əvvəl AI ilə oxuyun.");return}$("truth").value=SAMPLES[cur.idx].truth;liveCer()}
-function showRaw(raw,truth){const rw=raw.split(" "),tw=truth.split(" ");$("raw").className="raw";
- $("raw").innerHTML=rw.map((w,i)=>{const t=tw[i]||"";if(w===t)return esc(w);let h="";for(let k=0;k<w.length;k++)h+=w[k]!==t[k]?`<span class="err" title="Gözlənilən: ${esc(t[k]||"?")}">${esc(w[k])}</span>`:esc(w[k]);return h}).join(" ")}
-function liveCer(){const t=$("truth").value;if(!cur.raw)return;$("cerv").textContent=cerOf(cur.raw,t).toFixed(1)+"%";showRaw(cur.raw,t)}
-function ins(ch){const t=$("truth"),a=t.selectionStart,b=t.selectionEnd;t.value=t.value.slice(0,a)+ch+t.value.slice(b);t.focus();t.selectionStart=t.selectionEnd=a+1;liveCer()}
-function save(){const t=$("truth").value.trim();if(!cur.raw){toast("Əvvəl şəkli AI ilə oxudun.");return}if(!t){toast("Düzgün mətn boş ola bilməz.");return}
+function fillTruth(){
+ if(!cur.raw){toast("Əvvəl AI ilə oxuyun.");return}
+ if(cur.revealed){cur.revealed=false;cur.verified=false;$("answerArea").style.display="none";$("demoBtn").textContent=cur.idx>=0?"🔎 Düzgün cavabı göstər":"🔎 AI düzəlişini göstər";liveCer();return}
+ cur.revealed=true;
+ $("answerArea").style.display="block";
+ if(cur.idx>=0){
+   $("truth").value=SAMPLES[cur.idx].truth;
+   $("answerLabel").textContent="Hazır nümunənin etalon mətni — şəkillə yoxla:";
+ }else{
+   $("truth").value=cur.corrected||cur.raw;
+   $("answerLabel").textContent=cur.reviewOk?"AI-nin ikinci vizual yoxlaması (etalon deyil) — şəkillə yoxla:":"İkinci yoxlama alınmadı — OCR mətnini şəkillə yoxla:";
+ }
+ cur.verified=false;
+ $("demoBtn").textContent="Cavabı gizlət";
+ liveCer();
+}
+// Align characters with edit distance, not by their positions in words.
+// This handles Azerbaijani letters, insertions, deletions and substitutions.
+function alignedDiff(raw, truth) {
+ const a=Array.from(raw), b=Array.from(truth), m=a.length,n=b.length;
+ const dp=Array.from({length:m+1},()=>new Uint32Array(n+1));
+ for(let i=0;i<=m;i++)dp[i][0]=i;
+ for(let j=0;j<=n;j++)dp[0][j]=j;
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)
+  dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+ const out=[];let i=m,j=n;
+ while(i>0||j>0){
+  if(i>0&&j>0&&a[i-1]===b[j-1]){out.push({ch:a[--i],err:false});--j;}
+  else if(i>0&&j>0&&dp[i][j]===dp[i-1][j-1]+1){out.push({ch:a[--i],err:true,expected:b[--j]});}
+  else if(i>0&&dp[i][j]===dp[i-1][j]+1){out.push({ch:a[--i],err:true,expected:"[silinməli]"});}
+  else {out.push({ch:"∅",err:true,expected:b[--j]});}
+ }
+ return out.reverse();
+}
+function showAutomaticCorrections(){
+ const panel=$("autoCorrectPanel"),target=$("autoCorrectText"),note=$("autoCorrectNote");
+ panel.style.display="block";
+ const base=cur.raw||"", finalText=cur.corrected||base;
+ const a=Array.from(base),b=Array.from(finalText),m=a.length,n=b.length;
+ if(m*n>2000000){target.textContent=finalText;note.textContent="Mətn uzundur; rəngli fərq göstərilmədi.";return;}
+ // Levenshtein edit alignment. Highlight changed characters IN THE CORRECTED TEXT.
+ const dp=Array.from({length:m+1},()=>new Uint32Array(n+1));
+ for(let i=0;i<=m;i++)dp[i][0]=i;
+ for(let j=0;j<=n;j++)dp[0][j]=j;
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+ let i=m,j=n;const tokens=[];let changes=0;
+ while(i||j){
+  if(i&&j&&a[i-1]===b[j-1]){tokens.push({c:b[--j],changed:false});--i;}
+  else if(i&&j&&dp[i][j]===dp[i-1][j-1]+1){tokens.push({c:b[--j],changed:true});--i;changes++;}
+  else if(j&&dp[i][j]===dp[i][j-1]+1){tokens.push({c:b[--j],changed:true});changes++;}
+  else {--i;changes++;tokens.push({c:"",changed:true});}
+ }
+ tokens.reverse();target.innerHTML=tokens.map(x=>x.changed?`<mark style="background:#ffd46a;border-radius:3px">${esc(x.c)}</mark>`:esc(x.c)).join("");
+ note.textContent=changes?`AI ${changes} simvol əməliyyatı təklif edib (əvəzləmə/əlavə/silmə). Sarı hissələr avtomatik dəyişikliklərdir, təsdiqlənmiş etalon deyil.`:
+ (cur.correctionOk?"AI əlavə düzəliş təklif etməyib. Bu, mətnin səhvsiz olduğunu sübut etmir.":"AI düzəliş mərhələsi əlçatan olmadı; ilkin nəticə göstərilir.");
+}
+function renderAlignment(ops){
+ $("raw").className="raw";
+ $("raw").innerHTML=ops.map(x=>{
+   if(x.operation==="equal")return esc(x.original);
+   const label=x.operation==="insert"?"Çatışmayan: "+x.expected:
+     x.operation==="delete"?"Artıq simvol":"Gözlənilən: "+x.expected;
+   const shown=x.operation==="insert"?"[+"+x.expected+"]":x.original;
+   return `<span class="err" title="${esc(label)}">${esc(shown)}</span>`;
+ }).join("");
+}
+async function liveCer(){
+ const seq=++evaluationSeq;
+ if(!cur.raw)return;
+ const t=$("truth").value;
+ $("extraMetrics").style.display="none";
+ if(!cur.revealed){
+   $("raw").className="raw";$("raw").textContent=cur.raw;
+   $("cerLabel").textContent="CER — düzgün cavab açılmayıb";
+   $("cerv").textContent="—";return;
+ }
+ if(!t.trim()){$("raw").textContent=cur.raw;$("cerv").textContent="—";return;}
+ const trusted=cur.verified || (cur.idx>=0 && t===SAMPLES[cur.idx].truth);
+ const identical=cur.raw===t;
+ $("cerLabel").textContent=trusted?"Xam OCR CER — təsdiqlənmiş etalonla":"AI yoxlaması — etalon təsdiqlənməyib";
+ $("cerv").textContent="—";
+ const note=$("extraMetrics");
+ try{
+   const r=await fetch("/api/evaluate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prediction:cur.raw,reference:t})});
+   const d=await r.json();if(!r.ok)throw Error(d.detail||"Qiymətləndirmə xətası");
+   if(seq!==evaluationSeq)return;
+   renderAlignment(d.operations);
+   if(!trusted){
+     $("cerv").textContent="—";
+     note.textContent=identical
+       ? "İlkin OCR və AI yoxlaması eyni mətni qaytarıb; sarı fərq yoxdur. Bu, OCR-in səhvsiz olduğu demək deyil."
+       : "Sarı hərflər ilkin OCR ilə AI-nin ikinci yoxlaması arasındakı dəyişikliklərdir. Etalon təsdiqlənmədiyi üçün CER göstərilmir.";
+     note.style.display="block";
+     return;
+   }
+   $("cerv").textContent=d.cer_percent===null?"—":d.cer_percent.toFixed(2)+"%";
+   const r2=await fetch("/api/evaluate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prediction:cur.corrected||cur.raw,reference:t})});
+   if(!r2.ok)throw Error("İkinci metrika alınmadı");
+   const d2=await r2.json();if(seq!==evaluationSeq)return;
+   note.textContent="İlkin OCR CER (səhv): "+d.cer_percent.toFixed(2)+"% | Simvol düzgünlüyü (100−CER): "+d.character_correctness_percent.toFixed(2)+"% | WER: "+(d.wer_percent===null?"—":d.wer_percent.toFixed(2)+"%")+" | Redaktə edilmiş mətnin etalona CER-i: "+d2.cer_percent.toFixed(2)+"% | S: "+d.counts.substitutions+" · I: "+d.counts.insertions+" · D: "+d.counts.deletions;
+   note.style.display="block";
+ }catch(e){
+   if(seq!==evaluationSeq)return;
+   $("raw").className="raw";
+   $("raw").innerHTML=alignedDiff(cur.raw,t).map(x=>x.err?`<span class="err" title="Gözlənilən: ${esc(x.expected)}">${esc(x.ch)}</span>`:esc(x.ch)).join("");
+   $("cerLabel").textContent="Qiymətləndirmə serveri əlçatan deyil";
+   $("cerv").textContent="—";
+   note.textContent="Sarı fərqlər brauzerdə hesablanıb, CER isə təsdiqlənməyib.";note.style.display="block";
+ }
+}
+function onTruthInput(){cur.verified=false;liveCer()}
+function ins(ch){const t=$("truth"),a=t.selectionStart,b=t.selectionEnd;t.value=t.value.slice(0,a)+ch+t.value.slice(b);t.focus();t.selectionStart=t.selectionEnd=a+1;cur.verified=false;liveCer()}
+async function runLanguageReview(){
+ const btn=$("languageBtn"),out=$("languageResult");
+ const text=cur.revealed?$("truth").value.trim():cur.raw;
+ if(!text){toast("Əvvəl mətni oxut.");return}
+ btn.disabled=true;out.style.display="block";out.textContent="Dil analizi aparılır…";
+ try{
+   const res=await fetch("/api/language-review",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+   const data=await res.json();if(!res.ok)throw Error(data.detail||"Dil analizi alınmadı");
+   out.textContent="⚠️ Yalnız AI dil təklifi — təsdiqlənmiş qrammatik qayda və OCR etalonu deyil. Şəkildəki mətnə əsasən müstəqil yoxlayın.\n\n"+data.suggestion;
+ }catch(e){out.textContent="Dil analizi xətası: "+e.message}
+ finally{btn.disabled=false}
+}
+function save(){if(!cur.raw){toast("Əvvəl şəkli AI ilə oxut.");return}if(!cur.revealed){toast("Əvvəl düzgün cavabı / AI düzəlişini göstər.");return}const t=$("truth").value.trim();if(!t){toast("Etalon mətn boş ola bilməz.");return}if(!cur.verified){if(!confirm("Mətni şəkillə müqayisə edib etalon kimi təsdiqləyirsiniz?"))return;cur.verified=true;liveCer()}if(!cur.raw){toast("Əvvəl şəkli AI ilə oxudun.");return}if(!t){toast("Düzgün mətn boş ola bilməz.");return}
  const c=cerOf(cur.raw,t),e={id:"AZ-HW-"+String(ds.length+1).padStart(3,"0"),source:cur.src,raw:cur.raw,truth:t,cer:c,diff:$("diff").value,type:$("dtype").value};
  ds.unshift(e);persist();renderDs();toast(`Əlavə olundu: ${e.id} · CER ${c.toFixed(1)}%`);resetOut();setStep(1);$("status").textContent="Yeni nümunə üçün şəkil seçin."}
 
 function renderDs(){const n=ds.length,avg=n?ds.reduce((s,x)=>s+Number(x.cer),0)/n:0;
- $("nav-n").textContent=n;$("k-n").textContent=n;$("h-n").textContent=n;$("k-c").textContent=avg.toFixed(1)+"%";$("h-cer").textContent=avg.toFixed(1)+"%";$("k-a").textContent=Math.max(0,100-avg*1.1).toFixed(1)+"%";
+ $("nav-n").textContent=n;$("k-n").textContent=n;$("h-n").textContent=n;$("k-c").textContent=avg.toFixed(1)+"%";$("h-cer").textContent=avg.toFixed(1)+"%";$("k-a").textContent="—";
  $("dsb").innerHTML=ds.map(x=>{const k=x.diff==="Çətin"?"t-h":x.diff==="Orta"?"t-m":"t-e";return`<tr><td style="font:700 .82rem var(--mono);white-space:nowrap">${esc(x.id)}</td><td><b>${esc(x.source)}</b><div style="font-size:.76rem;color:var(--mut)">${esc(x.type)}</div></td><td style="font:.82rem var(--mono);color:var(--ter)">${esc(x.raw)}</td><td>${esc(x.truth)}</td><td style="font:800 .95rem var(--mono);color:var(--ter)">${Number(x.cer).toFixed(1)}%</td><td><span class="tag ${k}">${esc(x.diff)}</span></td><td><span class="tag t-ok">Təsdiqlənib</span></td></tr>`}).join("")}
 function dl(c,f,m){const u=URL.createObjectURL(new Blob([c],{type:m})),a=document.createElement("a");a.href=u;a.download=f;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u)}
 async function save2(c,f,m,msg){try{const d=await claude.use("downloads");if(d){await d.save({filename:f,data:c});toast(msg);return}}catch(e){}dl(c,f,m);toast(msg)}

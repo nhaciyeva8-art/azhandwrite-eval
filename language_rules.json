@@ -1,0 +1,69 @@
+[
+  {
+    "id": "AZ-LETTERS",
+    "title": "Azərbaycan əlifbasının xüsusi hərfləri",
+    "keywords": [
+      "ə",
+      "ı",
+      "i",
+      "ö",
+      "ü",
+      "ş",
+      "ğ",
+      "ç",
+      "azerbaycan",
+      "azərbaycan",
+      "inkişaf",
+      "artır"
+    ],
+    "guidance": "Azərbaycan əlifbasında ə, ı, ö, ü, ş, ğ, ç ayrı hərflərdir. Sözün kontekstinə əsasən uyğun hərfi seç; şəkildən oxunan orijinalı OCR mərhələsində dəyişmə.",
+    "source_url": "https://e-qanun.az/framework/42073",
+    "source_type": "official_orthography_context"
+  },
+  {
+    "id": "AZ-CASE",
+    "title": "Hal şəkilçiləri və mənsubiyyət",
+    "keywords": [
+      "dəniz",
+      "sahil",
+      "məktəb",
+      "üçün",
+      "azərbaycan",
+      "kitab",
+      "yiyəlik",
+      "yönlük"
+    ],
+    "guidance": "Hal və mənsubiyyət şəkilçilərini bütöv cümlə daxilində yoxla. Məsələn: Xəzər dənizinin sahilində. Təsdiqlənməmiş hallarda məcburi düzəliş etmə.",
+    "source_url": null,
+    "source_type": "editorial_summary_unverified"
+  },
+  {
+    "id": "AZ-VERB",
+    "title": "İstəmək feili ilə məsdər",
+    "keywords": [
+      "istəyirəm",
+      "istəyir",
+      "istəmək",
+      "almağa",
+      "artırmağa",
+      "öyrənməyə"
+    ],
+    "guidance": "İstəmək feili ilə niyyət bildirilən quruluşda çox vaxt məsdər işlənir: təhsil almaq və biliklərimi artırmaq istəyirəm. Konteksti nəzərə al; bütün -mağa formalarını avtomatik əvəz etmə.",
+    "source_url": null,
+    "source_type": "editorial_summary_unverified"
+  },
+  {
+    "id": "AZ-VOWEL",
+    "title": "Ahəng qanunu və şəkilçi variantları",
+    "keywords": [
+      "şəkilçi",
+      "inkişafi",
+      "artirmağa",
+      "azərbaycanin",
+      "məktəbə"
+    ],
+    "guidance": "Şəkilçilərin sait variantlarını və ı/i fərqini söz kökü və cümlə kontekstində yoxla. Nümunə: Azərbaycanın inkişafı.",
+    "source_url": "https://e-qanun.az/framework/42073",
+    "source_type": "official_orthography_context"
+  }
+]
