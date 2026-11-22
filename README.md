@@ -17,6 +17,12 @@ Layihə açıq tipli əlyazma cavabların rəqəmsallaşdırılmasını asanlaş
 
 > **Vacib:** AI tərəfindən redaktə edilmiş mətn OCR üçün müstəqil etalon deyil. Real CER/WER hesablamaq üçün şəkildə yazılanları əks etdirən, insan tərəfindən yoxlanmış etalon transkripsiya tələb olunur. CER/WER şagirdin cavabının məzmununa verilən qiymət deyil.
 
+## Canlı Demo
+
+AzHandwrite-Eval platformasını aşağıdakı link vasitəsilə sınaqdan keçirə bilərsiniz:
+
+[🔗 Platformanı açın](https://azhandwrite-eval.onrender.com/)
+
 ## Texnologiyalar
 
 | Hissə | Texnologiya |
